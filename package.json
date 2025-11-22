@@ -1,4 +1,13 @@
 {
+  "name": "plate-planner",
+  "version": "1.0.0",
+  "scripts": {
+    "start": "npm run start:frontend",
+    "start:frontend": "cd my-app && npm start",
+    "start:backend": "cd backend && npm start",
+    "dev:backend": "cd backend && npm run dev",
+    "install:all": "npm install && cd backend && npm install && cd ../my-app && npm install"
+  },
   "dependencies": {
     "lucide-react": "^0.554.0",
     "react-router-dom": "^7.9.6",
