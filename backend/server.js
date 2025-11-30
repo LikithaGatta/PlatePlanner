@@ -14,12 +14,13 @@ app.use(express.json());
 // Routes
 app.use("/api/auth", require("./routes/authRoutes"));
 app.use("/api/meals", require("./routes/mealRoutes"));
+app.use("/api/forum", require("./routes/postRoutes"));
 
-// Test route (IMPORTANT FOR DEBUG)
+// Test route
 app.get("/", (req, res) => {
-  res.send("Backend is working ");
+    res.send("Backend is working");
 });
 
 app.listen(5050, () => {
-  console.log("Server running on port 5050");
+    console.log("Server running on port 5050");
 });

@@ -41,7 +41,7 @@ export function LoginScreen({ onNavigate }: LoginScreenProps) {
         return;
       }
 
-      // Store token and userId for future authenticated requests
+      
       
       localStorage.clear();
 
@@ -49,20 +49,22 @@ export function LoginScreen({ onNavigate }: LoginScreenProps) {
       localStorage.setItem("token", data.token);
       localStorage.setItem("userId", data.userId);
 
-      setUser(null); // clear previous user first
+      setUser(null); 
 
-      // Update context with real user data
+      
       login(username);
-      setUser({
-        username: username,
-        email: username,
-        firstName: username.includes('@') ? username.split('@')[0] : username,
-        lastName: '',
-        allergies: [],
-        dietaryRestrictions: []
-      });
+        setUser({
+            _id: data.userId,
+            username: username,
+            email: username,
+            firstName: username.includes('@') ? username.split('@')[0] : username,
+            lastName: '',
+            allergies: [],
+            dietaryRestrictions: [],
+            token: data.token  
+        });
 
-      // Navigate to home/dashboard
+     
       onNavigate('home');
 
     } catch (error) {

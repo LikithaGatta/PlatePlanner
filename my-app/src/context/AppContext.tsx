@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, ReactNode } from 'react';
 
 interface User {
+    _id?: string;
   username: string;
   email: string;
   firstName: string;
@@ -11,7 +12,9 @@ interface User {
   height?: number;
   weight?: number;
   goalType?: 'lose' | 'gain' | 'maintain';
-  calorieGoal?: number;
+    calorieGoal?: number;
+    token?: string;
+    userId?: number;
 }
 
 interface Recipe {

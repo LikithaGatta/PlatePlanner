@@ -1,358 +1,443 @@
-import { ArrowLeft, MessageSquare, Heart, MessageCircle, Send, Home, Calendar, BookOpen, User, Plus, ThumbsUp } from 'lucide-react';
-import { Button } from './ui/button';
-import { Card } from './ui/card';
-import { Input } from './ui/input';
-import { Textarea } from './ui/textarea';
-import { useState } from 'react';
-import { useApp } from '../context/AppContext';
-import { toast } from 'sonner';
-
-interface CommunityForumProps {
-  onNavigate: (screen: any) => void;
-}
-
+import React, { useState, useEffect } from "react";
+import { ArrowLeft, MessageSquare, Send, Plus, ThumbsUp, MessageCircle, Edit, Trash } from "lucide-react";
+import { useApp } from "../context/AppContext";
 interface Post {
-  id: number;
-  author: string;
-  avatar: string;
-  title: string;
-  content: string;
-  category: 'recipe' | 'health' | 'tips' | 'question';
-  likes: number;
-  comments: number;
-  timestamp: string;
-  isLiked: boolean;
+    _id: string;
+    authorId: string;
+    authorName: string;
+    title: string;
+    content: string;
+    category: "recipe" | "health" | "tips" | "question";
+    likes: string[];
+    parentId?: string | null;
+    createdAt: string;
+    updatedAt: string;
+    replies?: Post[];
 }
 
-export function CommunityForum({ onNavigate }: CommunityForumProps) {
-  const { user } = useApp();
-  const [activeCategory, setActiveCategory] = useState<'all' | 'recipe' | 'health' | 'tips' | 'question'>('all');
-  const [showNewPost, setShowNewPost] = useState(false);
-  const [newPostTitle, setNewPostTitle] = useState('');
-  const [newPostContent, setNewPostContent] = useState('');
-  const [newPostCategory, setNewPostCategory] = useState<'recipe' | 'health' | 'tips' | 'question'>('recipe');
-  
-  const [posts, setPosts] = useState<Post[]>([
-    {
-      id: 1,
-      author: 'Sarah M.',
-      avatar: '👩‍🍳',
-      title: 'My favorite protein smoothie recipe!',
-      content: 'Just tried this amazing combo: banana, spinach, protein powder, and almond butter. Game changer for breakfast!',
-      category: 'recipe',
-      likes: 24,
-      comments: 8,
-      timestamp: '2 hours ago',
-      isLiked: false
-    },
-    {
-      id: 2,
-      author: 'Mike J.',
-      avatar: '🏋️',
-      title: 'Tips for staying consistent with meal prep',
-      content: 'I prep all my meals on Sunday and it has completely changed my week. Here are my top 5 tips...',
-      category: 'tips',
-      likes: 42,
-      comments: 15,
-      timestamp: '5 hours ago',
-      isLiked: false
-    },
-    {
-      id: 3,
-      author: 'Emma K.',
-      avatar: '🌱',
-      title: 'Best vegetables for weight loss?',
-      content: 'Looking for recommendations on vegetables that are filling but low in calories. What works for you?',
-      category: 'question',
-      likes: 18,
-      comments: 12,
-      timestamp: '1 day ago',
-      isLiked: false
-    },
-    {
-      id: 4,
-      author: 'David L.',
-      avatar: '🥗',
-      title: 'The importance of hydration',
-      content: 'Reminder: Drinking enough water is crucial for your metabolism and overall health. Aim for 8 glasses a day!',
-      category: 'health',
-      likes: 56,
-      comments: 6,
-      timestamp: '1 day ago',
-      isLiked: false
-    },
-    {
-      id: 5,
-      author: 'Lisa R.',
-      avatar: '🍳',
-      title: 'Quick 5-minute breakfast ideas',
-      content: 'For those busy mornings: overnight oats, Greek yogurt parfait, or avocado toast. Share yours!',
-      category: 'recipe',
-      likes: 35,
-      comments: 20,
-      timestamp: '2 days ago',
-      isLiked: false
-    }
-  ]);
+interface Props {
+    onNavigate: (screen: string) => void;
+}
 
-  const handleLike = (postId: number) => {
-    setPosts(posts.map(post => 
-      post.id === postId 
-        ? { ...post, likes: post.isLiked ? post.likes - 1 : post.likes + 1, isLiked: !post.isLiked }
-        : post
-    ));
-  };
 
-  const handleCreatePost = () => {
-    if (!newPostTitle.trim() || !newPostContent.trim()) {
-      toast.error('Please fill in both title and content');
-      return;
-    }
+export function CommunityForum({ onNavigate }: Props) {
+    const { user } = useApp();
+    const token = user?.token;
 
-    const newPost: Post = {
-      id: posts.length + 1,
-      author: user?.firstName ? `${user.firstName} ${user.lastName?.charAt(0)}.` : 'You',
-      avatar: '👤',
-      title: newPostTitle,
-      content: newPostContent,
-      category: newPostCategory,
-      likes: 0,
-      comments: 0,
-      timestamp: 'Just now',
-      isLiked: false
+    const [posts, setPosts] = useState<Post[]>([]);
+    const [loading, setLoading] = useState(false);
+    const [activeCategory, setActiveCategory] = useState<"all" | "recipe" | "health" | "tips" | "question">("all");
+    const [showNewPost, setShowNewPost] = useState<string | null>(null);
+    const [newPostTitle, setNewPostTitle] = useState("");
+    const [newPostContent, setNewPostContent] = useState("");
+    const [newPostCategory, setNewPostCategory] = useState<"recipe" | "health" | "tips" | "question">("recipe");
+    const [editingPost, setEditingPost] = useState<string | null>(null);
+    const [editTitle, setEditTitle] = useState("");
+    const [editContent, setEditContent] = useState("");
+    const [replyForms, setReplyForms] = useState<Record<string, { title: string; content: string }>>({});
+
+    useEffect(() => {
+        if (user) {
+            fetchPosts();
+        }
+    }, [user]);
+
+    const fetchPosts = async () => {
+        setLoading(true);
+        try {
+            const res = await fetch("http://localhost:5050/api/forum", {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            if (!res.ok) throw new Error("Failed to fetch");
+            const data: Post[] = await res.json();
+            setPosts(data);
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setLoading(false);
+        }
     };
 
-    setPosts([newPost, ...posts]);
-    setNewPostTitle('');
-    setNewPostContent('');
-    setShowNewPost(false);
-    toast.success('Post created successfully!');
-  };
+    const createPost = async (parentId: string | null = null) => {
+        const title = parentId ? (replyForms[parentId]?.title || "") : newPostTitle;
+        const content = parentId ? (replyForms[parentId]?.content || "") : newPostContent;
 
-  const getCategoryColor = (category: string) => {
-    switch(category) {
-      case 'recipe': return 'bg-purple-100 text-purple-700 border-purple-200';
-      case 'health': return 'bg-green-100 text-green-700 border-green-200';
-      case 'tips': return 'bg-blue-100 text-blue-700 border-blue-200';
-      case 'question': return 'bg-orange-100 text-orange-700 border-orange-200';
-      default: return 'bg-gray-100 text-gray-700 border-gray-200';
+        if (!title.trim() || !content.trim()) {
+            alert("Please fill in both title and content");
+            return;
+        }
+
+        try {
+            const res = await fetch("http://localhost:5050/api/forum", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({
+                    title,
+                    content,
+                    category: newPostCategory,
+                    parentId: parentId || null,
+                }),
+            });
+
+            if (!res.ok) throw new Error("Failed to create post");
+            const data: Post = await res.json();
+
+            if (parentId) {
+                setPosts((prev) => addReply(prev, parentId, data));
+                setReplyForms(prev => {
+                    const updated = { ...prev };
+                    delete updated[parentId];
+                    return updated;
+                });
+            } else {
+                setPosts((prev) => [data, ...prev]);
+                setNewPostTitle("");
+                setNewPostContent("");
+                setNewPostCategory("recipe");
+            }
+
+            setShowNewPost(null);
+        } catch (err) {
+            console.error(err);
+            alert("Failed to create post");
+        }
+    };
+
+    const addReply = (postsArray: Post[], parentId: string, reply: Post): Post[] => {
+        return postsArray.map((p) => {
+            if (p._id === parentId) {
+                const replies = p.replies ? [...p.replies, reply] : [reply];
+                return { ...p, replies };
+            } else if (p.replies) {
+                return { ...p, replies: addReply(p.replies, parentId, reply) };
+            }
+            return p;
+        });
+    };
+
+    const toggleLike = async (postId: string) => {
+        try {
+            const res = await fetch(`http://localhost:5050/api/forum/${postId}/like`, {
+                method: "POST",
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            if (!res.ok) throw new Error("Failed to like");
+            const data = await res.json();
+            setPosts((prev) => updateLikes(prev, postId, data.likes));
+        } catch (err) {
+            console.error(err);
+        }
+    };
+
+    const updateLikes = (postsArray: Post[], postId: string, likes: string[]): Post[] => {
+        return postsArray.map((p) => {
+            if (p._id === postId) return { ...p, likes };
+            if (p.replies) return { ...p, replies: updateLikes(p.replies, postId, likes) };
+            return p;
+        });
+    };
+
+    const startEdit = (post: Post) => {
+        setEditingPost(post._id);
+        setEditTitle(post.title);
+        setEditContent(post.content);
+    };
+
+    const saveEdit = async (postId: string) => {
+        try {
+            const res = await fetch(`http://localhost:5050/api/forum/${postId}`, {
+                method: "PUT",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({ title: editTitle, content: editContent }),
+            });
+            if (!res.ok) throw new Error("Failed to edit");
+            const data: Post = await res.json();
+            setPosts((prev) => updatePost(prev, postId, data));
+            setEditingPost(null);
+        } catch (err) {
+            console.error(err);
+            alert("Failed to edit post");
+        }
+    };
+
+    const deletePost = async (postId: string) => {
+        if (!window.confirm("Are you sure you want to delete this post?")) return;
+        try {
+            const res = await fetch(`http://localhost:5050/api/forum/${postId}`, {
+                method: "DELETE",
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            if (!res.ok) throw new Error("Failed to delete");
+            setPosts((prev) => removePost(prev, postId));
+        } catch (err) {
+            console.error(err);
+            alert("Failed to delete post");
+        }
+    };
+
+    const updatePost = (postsArray: Post[], postId: string, updatedPost: Post): Post[] => {
+        return postsArray.map((p) => {
+            if (p._id === postId) return updatedPost;
+            if (p.replies) return { ...p, replies: updatePost(p.replies, postId, updatedPost) };
+            return p;
+        });
+    };
+
+    const removePost = (postsArray: Post[], postId: string): Post[] => {
+        return postsArray
+            .filter((p) => p._id !== postId)
+            .map((p) => (p.replies ? { ...p, replies: removePost(p.replies, postId) } : p));
+    };
+
+    const getCategoryColor = (category: string): string => {
+        const colors: Record<string, string> = {
+            recipe: "bg-purple-100 text-purple-700 border-purple-200",
+            health: "bg-green-100 text-green-700 border-green-200",
+            tips: "bg-blue-100 text-blue-700 border-blue-200",
+            question: "bg-orange-100 text-orange-700 border-orange-200"
+        };
+        return colors[category] || "bg-gray-100 text-gray-700 border-gray-200";
+    };
+
+    const PostCard: React.FC<{ post: Post; depth?: number }> = ({ post, depth = 0 }) => {
+        const isOwner = user?._id === post.authorId;
+        const isLiked = post.likes.includes(user?._id || "");
+        const isEditing = editingPost === post._id;
+
+        return (
+            <div style={{ marginLeft: depth * 20 }} className="mb-3">
+                <div className="p-4 border-2 border-gray-200 rounded-lg hover:border-purple-200 transition-colors bg-white">
+                    <div className="flex justify-between items-start mb-2">
+                        <div>
+                            <p className="text-sm font-semibold text-gray-800">{post.authorName}</p>
+                            <span className="text-xs text-gray-400">
+                                {new Date(post.createdAt).toLocaleDateString()} at {new Date(post.createdAt).toLocaleTimeString()}
+                            </span>
+                        </div>
+                        {isOwner && !isEditing && (
+                            <div className="flex gap-2">
+                                <button onClick={() => startEdit(post)} className="text-gray-500 hover:text-blue-600">
+                                    <Edit className="w-4 h-4" />
+                                </button>
+                                <button onClick={() => deletePost(post._id)} className="text-gray-500 hover:text-red-600">
+                                    <Trash className="w-4 h-4" />
+                                </button>
+                            </div>
+                        )}
+                    </div>
+
+                    <div className={`inline-block px-2 py-1 rounded text-xs border mb-2 ${getCategoryColor(post.category)}`}>
+                        {post.category.charAt(0).toUpperCase() + post.category.slice(1)}
+                    </div>
+
+                    {isEditing ? (
+                        <div className="space-y-2">
+                            <input
+                                value={editTitle}
+                                onChange={(e) => setEditTitle(e.target.value)}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                                placeholder="Title"
+                            />
+                            <textarea
+                                value={editContent}
+                                onChange={(e) => setEditContent(e.target.value)}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                                rows={3}
+                                placeholder="Content"
+                            />
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={() => saveEdit(post._id)}
+                                    className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+                                >
+                                    Save
+                                </button>
+                                <button
+                                    onClick={() => setEditingPost(null)}
+                                    className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
+                                >
+                                    Cancel
+                                </button>
+                            </div>
+                        </div>
+                    ) : (
+                        <>
+                            <h3 className="mt-2 font-semibold text-gray-900">{post.title}</h3>
+                            <p className="text-gray-600 mt-1">{post.content}</p>
+
+                            <div className="flex items-center gap-4 mt-3">
+                                <button
+                                    onClick={() => toggleLike(post._id)}
+                                    className={`flex items-center gap-1 ${isLiked ? "text-purple-600" : "text-gray-500 hover:text-purple-600"}`}
+                                >
+                                    <ThumbsUp className="w-4 h-4" /> {post.likes.length}
+                                </button>
+                                <button
+                                    onClick={() => setShowNewPost(showNewPost === post._id ? null : post._id)}
+                                    className="flex items-center gap-1 text-gray-500 hover:text-purple-600"
+                                >
+                                    <MessageCircle className="w-4 h-4" /> Reply
+                                </button>
+                            </div>
+                        </>
+                    )}
+
+                    {showNewPost === post._id && (
+                        <div className="mt-3 space-y-2 p-3 bg-gray-50 rounded-lg">
+                            <input
+                                value={replyForms[post._id]?.title || ""}
+                                onChange={(e) => {
+                                    const value = e.target.value;
+                                    setReplyForms(prev => ({
+                                        ...prev,
+                                        [post._id]: {
+                                            title: value,
+                                            content: prev[post._id]?.content || ""
+                                        }
+                                    }));
+                                }}
+                                placeholder="Reply title"
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                            />
+                            <textarea
+                                value={replyForms[post._id]?.content || ""}
+                                onChange={(e) => {
+                                    const value = e.target.value;
+                                    setReplyForms(prev => ({
+                                        ...prev,
+                                        [post._id]: {
+                                            title: prev[post._id]?.title || "",
+                                            content: value
+                                        }
+                                    }));
+                                }}
+                                placeholder="Your reply..."
+                                rows={3}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                            />
+                            <button
+                                onClick={() => createPost(post._id)}
+                                className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg"
+                            >
+                                <Send className="w-4 h-4" /> Reply
+                            </button>
+                        </div>
+                    )}
+
+                    {post.replies && post.replies.map((reply) => (
+                        <PostCard key={reply._id} post={reply} depth={depth + 1} />
+                    ))}
+                </div>
+            </div>
+        );
+    };
+
+    const filteredPosts = activeCategory === "all" ? posts : posts.filter((p) => p.category === activeCategory);
+
+    if (!user) {
+        return (
+            <div className="w-full max-w-2xl mx-auto bg-white rounded-2xl shadow-xl overflow-hidden p-8">
+                <p className="text-center text-gray-600">Please log in to view the forum</p>
+            </div>
+        );
     }
-  };
 
-  const filteredPosts = activeCategory === 'all' 
-    ? posts 
-    : posts.filter(post => post.category === activeCategory);
-
-  return (
-    <div className="w-full max-w-md bg-white rounded-2xl shadow-xl overflow-hidden">
-      {/* Header */}
-      <div className="bg-gradient-to-r from-purple-600 to-purple-500 p-6 text-white">
-        <button 
-          onClick={() => onNavigate('home')}
-          className="mb-4 flex items-center text-white/90 hover:text-white transition-colors"
-        >
-          <ArrowLeft className="w-5 h-5 mr-2" />
-          Back to Home
-        </button>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center">
-              <MessageSquare className="w-6 h-6" />
-            </div>
-            <div>
-              <h2 className="text-white mb-1">Community Forum</h2>
-              <p className="text-purple-100 text-sm">Share & learn together</p>
-            </div>
-          </div>
-          <button 
-            onClick={() => setShowNewPost(!showNewPost)}
-            className="w-10 h-10 bg-white/20 backdrop-blur-sm rounded-lg flex items-center justify-center hover:bg-white/30 transition-colors"
-          >
-            <Plus className="w-5 h-5" />
-          </button>
-        </div>
-      </div>
-
-      {/* Content */}
-      <div className="p-6 space-y-6 max-h-[600px] overflow-y-auto">
-        {/* New Post Form */}
-        {showNewPost && (
-          <Card className="p-4 border-2 border-purple-200 bg-purple-50">
-            <p className="text-gray-700 mb-4">Create New Post</p>
-            <div className="space-y-3">
-              <Input
-                placeholder="Post title"
-                value={newPostTitle}
-                onChange={(e) => setNewPostTitle(e.target.value)}
-                className="h-10"
-              />
-              <Textarea
-                placeholder="What's on your mind?"
-                value={newPostContent}
-                onChange={(e) => setNewPostContent(e.target.value)}
-                rows={4}
-              />
-              <div className="flex gap-2">
-                <select
-                  value={newPostCategory}
-                  onChange={(e) => setNewPostCategory(e.target.value as any)}
-                  className="flex-1 h-10 rounded-lg border border-gray-300 px-3 text-sm"
+    return (
+        <div className="w-full max-w-2xl mx-auto bg-white rounded-2xl shadow-xl overflow-hidden">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-purple-600 to-purple-500 p-6 text-white">
+                <button
+                    onClick={() => onNavigate("home")}
+                    className="mb-4 flex items-center text-white/90 hover:text-white transition-colors"
                 >
-                  <option value="recipe">Recipe</option>
-                  <option value="health">Health</option>
-                  <option value="tips">Tips</option>
-                  <option value="question">Question</option>
-                </select>
-                <Button
-                  onClick={handleCreatePost}
-                  className="bg-purple-600 hover:bg-purple-700 text-white"
-                >
-                  <Send className="w-4 h-4 mr-2" />
-                  Post
-                </Button>
-              </div>
-            </div>
-          </Card>
-        )}
-
-        {/* Category Filter */}
-        <div className="flex gap-2 overflow-x-auto pb-2">
-          <button
-            onClick={() => setActiveCategory('all')}
-            className={`px-4 py-2 rounded-lg text-sm whitespace-nowrap transition-colors ${
-              activeCategory === 'all'
-                ? 'bg-purple-600 text-white'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            }`}
-          >
-            All Posts
-          </button>
-          <button
-            onClick={() => setActiveCategory('recipe')}
-            className={`px-4 py-2 rounded-lg text-sm whitespace-nowrap transition-colors ${
-              activeCategory === 'recipe'
-                ? 'bg-purple-600 text-white'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            }`}
-          >
-            Recipes
-          </button>
-          <button
-            onClick={() => setActiveCategory('health')}
-            className={`px-4 py-2 rounded-lg text-sm whitespace-nowrap transition-colors ${
-              activeCategory === 'health'
-                ? 'bg-purple-600 text-white'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            }`}
-          >
-            Health
-          </button>
-          <button
-            onClick={() => setActiveCategory('tips')}
-            className={`px-4 py-2 rounded-lg text-sm whitespace-nowrap transition-colors ${
-              activeCategory === 'tips'
-                ? 'bg-purple-600 text-white'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            }`}
-          >
-            Tips
-          </button>
-          <button
-            onClick={() => setActiveCategory('question')}
-            className={`px-4 py-2 rounded-lg text-sm whitespace-nowrap transition-colors ${
-              activeCategory === 'question'
-                ? 'bg-purple-600 text-white'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            }`}
-          >
-            Questions
-          </button>
-        </div>
-
-        {/* Posts */}
-        <div className="space-y-4">
-          {filteredPosts.map((post) => (
-            <Card key={post.id} className="p-4 border-2 border-gray-200 hover:border-purple-200 transition-colors">
-              <div className="flex items-start gap-3 mb-3">
-                <div className="w-10 h-10 bg-gradient-to-br from-purple-100 to-purple-200 rounded-full flex items-center justify-center text-xl">
-                  {post.avatar}
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1">
-                    <p className="text-sm text-gray-900">{post.author}</p>
-                    <span className="text-xs text-gray-400">• {post.timestamp}</span>
-                  </div>
-                  <div className={`inline-block px-2 py-1 rounded text-xs border ${getCategoryColor(post.category)}`}>
-                    {post.category.charAt(0).toUpperCase() + post.category.slice(1)}
-                  </div>
-                </div>
-              </div>
-
-              <div className="mb-3">
-                <p className="text-gray-900 mb-2">{post.title}</p>
-                <p className="text-sm text-gray-600">{post.content}</p>
-              </div>
-
-              <div className="flex items-center gap-4 pt-3 border-t border-gray-100">
-                <button 
-                  onClick={() => handleLike(post.id)}
-                  className={`flex items-center gap-1 text-sm transition-colors ${
-                    post.isLiked ? 'text-purple-600' : 'text-gray-500 hover:text-purple-600'
-                  }`}
-                >
-                  <ThumbsUp className={`w-4 h-4 ${post.isLiked ? 'fill-current' : ''}`} />
-                  {post.likes}
+                    <ArrowLeft className="w-5 h-5 mr-2" /> Back to Home
                 </button>
-                <button className="flex items-center gap-1 text-sm text-gray-500 hover:text-purple-600 transition-colors">
-                  <MessageCircle className="w-4 h-4" />
-                  {post.comments}
-                </button>
-              </div>
-            </Card>
-          ))}
-        </div>
-      </div>
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center">
+                            <MessageSquare className="w-6 h-6" />
+                        </div>
+                        <div>
+                            <h2 className="text-2xl font-bold">Community Forum</h2>
+                            <p className="text-purple-100 text-sm">Share & learn together</p>
+                        </div>
+                    </div>
+                    <button
+                        onClick={() => setShowNewPost(showNewPost === "new" ? null : "new")}
+                        className="w-10 h-10 bg-white/20 backdrop-blur-sm rounded-lg flex items-center justify-center hover:bg-white/30 transition-colors"
+                    >
+                        <Plus className="w-5 h-5" />
+                    </button>
+                </div>
+            </div>
 
-      {/* Bottom Navigation */}
-      <div className="border-t border-gray-200 bg-white px-6 py-4">
-        <div className="flex justify-around">
-          <button 
-            className="flex flex-col items-center gap-1 text-gray-400 hover:text-gray-600"
-            onClick={() => onNavigate('home')}
-          >
-            <Home className="w-6 h-6" />
-            <span className="text-xs">Home</span>
-          </button>
-          <button 
-            className="flex flex-col items-center gap-1 text-gray-400 hover:text-gray-600"
-            onClick={() => onNavigate('track-meals')}
-          >
-            <Calendar className="w-6 h-6" />
-            <span className="text-xs">Track</span>
-          </button>
-          <button 
-            className="flex flex-col items-center gap-1 text-gray-400 hover:text-gray-600"
-            onClick={() => onNavigate('recipe')}
-          >
-            <BookOpen className="w-6 h-6" />
-            <span className="text-xs">Recipes</span>
-          </button>
-          <button 
-            className="flex flex-col items-center gap-1 text-purple-600"
-            onClick={() => onNavigate('community')}
-          >
-            <MessageSquare className="w-6 h-6" />
-            <span className="text-xs">Community</span>
-          </button>
-          <button 
-            className="flex flex-col items-center gap-1 text-gray-400 hover:text-gray-600"
-            onClick={() => onNavigate('profile')}
-          >
-            <User className="w-6 h-6" />
-            <span className="text-xs">Profile</span>
-          </button>
+            {/* New Post Form */}
+            {showNewPost === "new" && (
+                <div className="p-4 border-2 border-purple-200 bg-purple-50 m-4 rounded-lg">
+                    <input
+                        value={newPostTitle}
+                        onChange={(e) => setNewPostTitle(e.target.value)}
+                        placeholder="Post title"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg mb-2"
+                    />
+                    <textarea
+                        value={newPostContent}
+                        onChange={(e) => setNewPostContent(e.target.value)}
+                        placeholder="What's on your mind?"
+                        rows={4}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg mb-2"
+                    />
+                    <select
+                        value={newPostCategory}
+                        onChange={(e) => setNewPostCategory(e.target.value as "recipe" | "health" | "tips" | "question")}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg mb-2"
+                    >
+                        <option value="recipe">Recipe</option>
+                        <option value="health">Health</option>
+                        <option value="tips">Tips</option>
+                        <option value="question">Question</option>
+                    </select>
+                    <button
+                        onClick={() => createPost()}
+                        className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg"
+                    >
+                        <Send className="w-4 h-4" /> Post
+                    </button>
+                </div>
+            )}
+
+            {/* Category Filter */}
+            <div className="flex gap-2 overflow-x-auto pb-2 p-4">
+                {(["all", "recipe", "health", "tips", "question"] as const).map((cat) => (
+                    <button
+                        key={cat}
+                        onClick={() => setActiveCategory(cat)}
+                        className={`px-4 py-2 rounded-lg text-sm whitespace-nowrap transition-colors ${activeCategory === cat
+                                ? "bg-purple-600 text-white"
+                                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                            }`}
+                    >
+                        {cat.charAt(0).toUpperCase() + cat.slice(1)}
+                    </button>
+                ))}
+            </div>
+
+            {/* Posts */}
+            <div className="p-6 max-h-[600px] overflow-y-auto">
+                {loading ? (
+                    <p className="text-center text-gray-500">Loading posts...</p>
+                ) : filteredPosts.length === 0 ? (
+                    <p className="text-center text-gray-500">No posts yet. Be the first to post!</p>
+                ) : (
+                    filteredPosts.map((post) => <PostCard key={post._id} post={post} />)
+                )}
+            </div>
         </div>
-      </div>
-    </div>
-  );
+    );
 }
