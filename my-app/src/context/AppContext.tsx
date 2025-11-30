@@ -76,7 +76,7 @@ interface AppContextType {
   dailyMealLogs: DailyMealLog[];
   login: (username: string) => void;
   logout: () => void;
-  setUser: (user: User) => void;
+  setUser: (user: User | null) => void;
   toggleFavorite: (recipeId: number) => void;
   addActivity: (activity: Omit<Activity, 'id' | 'timestamp'> & { timestamp?: string }) => void;
   rateRecipe: (recipeId: number, rating: number) => void;
@@ -359,9 +359,12 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   };
 
   const logout = () => {
-    setIsLoggedIn(false);
-    setUser(null);
-  };
+  setIsLoggedIn(false);
+  setUser(null);
+  setDailyMealLogs([]); // clears old meals
+  localStorage.clear();
+};
+
 
   const toggleFavorite = (recipeId: number) => {
     setRecipes(recipes.map(recipe => 

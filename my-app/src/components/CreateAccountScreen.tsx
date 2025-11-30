@@ -30,18 +30,23 @@ const handleCreateAccount = async () => {
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        name: `${formData.firstName} ${formData.lastName}`, // ✅ REQUIRED BY BACKEND
+        name: `${formData.firstName} ${formData.lastName}`,
         email: formData.email,
         password: formData.password
       })
     });
 
+    const data = await response.json();
+
     if (!response.ok) {
-      const err = await response.json();
-      throw new Error(err.error || "Account creation failed");
+      throw new Error(data.error || "Account creation failed");
     }
 
-    
+    localStorage.clear();
+
+    localStorage.setItem("token", data.token);
+    localStorage.setItem("userId", data.userId);
+
     setUser({
       username: formData.username,
       email: formData.email,
@@ -51,7 +56,6 @@ const handleCreateAccount = async () => {
       dietaryRestrictions: []
     });
 
-    
     onNavigate("onboarding");
 
   } catch (error: any) {

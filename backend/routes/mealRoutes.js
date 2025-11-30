@@ -34,6 +34,7 @@ router.post("/", auth, async (req, res) => {
 });
 
 // Get meals for logged-in user
+
 router.get("/", auth, async (req, res) => {
   try {
     const userId = req.userId;
@@ -46,6 +47,7 @@ router.get("/", auth, async (req, res) => {
     res.status(500).json({ error: "Failed to fetch meals" });
   }
 });
+
 
 
 module.exports = router;

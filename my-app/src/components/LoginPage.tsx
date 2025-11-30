@@ -42,8 +42,14 @@ export function LoginScreen({ onNavigate }: LoginScreenProps) {
       }
 
       // Store token and userId for future authenticated requests
+      
+      localStorage.clear();
+
+      
       localStorage.setItem("token", data.token);
       localStorage.setItem("userId", data.userId);
+
+      setUser(null); // clear previous user first
 
       // Update context with real user data
       login(username);
