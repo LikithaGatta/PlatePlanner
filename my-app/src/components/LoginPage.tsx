@@ -58,18 +58,20 @@ export function LoginScreen({ onNavigate }: LoginScreenProps) {
         localStorage.setItem("user", JSON.stringify(data.user));
       }
 
-      setUser(null); 
+        setUser(null); 
 
-      // Update context with real user data from backend
+      
       login(username);
-      setUser(data.user || {
-        username: username,
-        email: username,
-        firstName: username.includes('@') ? username.split('@')[0] : username,
-        lastName: '',
-        allergies: [],
-        dietaryRestrictions: []
-      });
+        setUser({
+            _id: data.userId,
+            username: username,
+            email: username,
+            firstName: username.includes('@') ? username.split('@')[0] : username,
+            lastName: '',
+            allergies: [],
+            dietaryRestrictions: [],
+            token: data.token  
+        });
 
      
       onNavigate('home');
