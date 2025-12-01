@@ -17,18 +17,46 @@ export function ProfilePage({ onNavigate }: ProfilePageProps) {
     weight: user?.weight?.toString() || ''
   });
 
-  const handleSave = () => {
-    if (user) {
-      setUser({
-        ...user,
-        firstName: editData.firstName,
-        lastName: editData.lastName,
-        email: editData.email,
-        height: editData.height ? parseFloat(editData.height) : undefined,
-        weight: editData.weight ? parseFloat(editData.weight) : undefined
-      });
+  const handleSave = async () => {
+    if (!user) return;
+
+    try {
+      const token = localStorage.getItem("token");
+      if (token) {
+        const response = await fetch("http://localhost:5050/api/auth/profile", {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            firstName: editData.firstName,
+            lastName: editData.lastName,
+            email: editData.email,
+            height: editData.height ? parseFloat(editData.height) : undefined,
+            weight: editData.weight ? parseFloat(editData.weight) : undefined
+          })
+        });
+
+        const data = await response.json();
+        
+        if (response.ok && data.user) {
+          // Update localStorage
+          localStorage.setItem("user", JSON.stringify(data.user));
+          
+          // Update context
+          setUser(data.user);
+          setIsEditing(false);
+          alert("Profile updated successfully!");
+          return;
+        } else {
+          alert(data.error || "Failed to update profile");
+        }
+      }
+    } catch (error) {
+      console.error("Profile update error:", error);
+      alert("Cannot connect to server.");
     }
-    setIsEditing(false);
   };
 
   const handleLogout = () => {

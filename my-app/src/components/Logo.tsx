@@ -12,7 +12,7 @@ export function Logo({ className = '', size = 'md' }: LogoProps) {
 
   return (
     <img 
-      src="/logo.png" 
+      src="/plateplanner-logo.png" 
       alt="PlatePlanner Logo" 
       className={`${sizeMap[size]} ${className}`}
     />
