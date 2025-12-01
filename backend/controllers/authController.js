@@ -129,3 +129,47 @@ exports.resetPassword = async (req, res) => {
     res.status(500).json({ error: "Password reset failed" });
   }
 };
+
+exports.updateProfile = async (req, res) => {
+  try {
+    const userId = req.userId; // from auth middleware
+    const { gender, height, weight, goalType, calorieGoal, allergies, dietaryRestrictions } = req.body;
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    // Update fields
+    if (gender !== undefined) user.gender = gender;
+    if (height !== undefined) user.height = height;
+    if (weight !== undefined) user.weight = weight;
+    if (goalType !== undefined) user.goalType = goalType;
+    if (calorieGoal !== undefined) user.calorieGoal = calorieGoal;
+    if (allergies !== undefined) user.allergies = allergies;
+    if (dietaryRestrictions !== undefined) user.dietaryRestrictions = dietaryRestrictions;
+
+    await user.save();
+
+    res.json({
+      message: "Profile updated successfully",
+      user: {
+        username: user.email,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        allergies: user.allergies,
+        dietaryRestrictions: user.dietaryRestrictions,
+        gender: user.gender,
+        height: user.height,
+        weight: user.weight,
+        goalType: user.goalType,
+        calorieGoal: user.calorieGoal
+      }
+    });
+
+  } catch (error) {
+    console.error("UPDATE PROFILE ERROR:", error);
+    res.status(500).json({ error: "Profile update failed" });
+  }
+};

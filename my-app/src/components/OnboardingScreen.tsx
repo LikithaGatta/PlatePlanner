@@ -19,6 +19,27 @@ export function OnboardingScreen({ onNavigate }: OnboardingScreenProps) {
     otherAllergy: ''
   });
 
+  const calculateBMI = () => {
+    if (!onboardingData.heightFeet || !onboardingData.weight) {
+      return 0;
+    }
+    const feet = parseFloat(onboardingData.heightFeet);
+    const inches = parseFloat(onboardingData.heightInches || '0');
+    const totalInches = (feet * 12) + inches;
+    const weightLb = parseFloat(onboardingData.weight);
+    
+    // BMI = (weight in lb / (height in inches)²) × 703
+    const bmi = (weightLb / (totalInches * totalInches)) * 703;
+    return Math.round(bmi * 10) / 10;
+  };
+
+  const getBMICategory = (bmi: number) => {
+    if (bmi < 18.5) return { category: 'Underweight', color: 'text-blue-600' };
+    if (bmi < 25) return { category: 'Normal', color: 'text-green-600' };
+    if (bmi < 30) return { category: 'Overweight', color: 'text-yellow-600' };
+    return { category: 'Obese', color: 'text-red-600' };
+  };
+
   const calculateCalorieGoal = () => {
     if (!onboardingData.heightFeet || !onboardingData.weight || !onboardingData.gender || !onboardingData.goalType) {
       return 2000; // default
@@ -34,7 +55,11 @@ export function OnboardingScreen({ onNavigate }: OnboardingScreenProps) {
     const weightLb = parseFloat(onboardingData.weight);
     const weightKg = weightLb * 0.453592;
     
-    // Basic BMR calculation (Mifflin-St Jeor equation)
+    // Calculate BMI
+    const bmi = calculateBMI();
+    
+    // Basic BMR calculation (Mifflin-St Jeor equation) - more accurate than BMI alone
+    // This considers gender, weight, and height
     let bmr = 0;
     if (onboardingData.gender === 'male') {
       bmr = 10 * weightKg + 6.25 * heightCm - 5 * 25 + 5; // assuming age 25
@@ -46,6 +71,13 @@ export function OnboardingScreen({ onNavigate }: OnboardingScreenProps) {
 
     // Activity factor (assuming moderate activity)
     let tdee = bmr * 1.55;
+    
+    // Adjust activity factor based on BMI
+    if (bmi < 18.5) {
+      tdee = bmr * 1.6; // slightly higher for underweight
+    } else if (bmi > 30) {
+      tdee = bmr * 1.5; // slightly lower for obese
+    }
 
     // Adjust based on goal
     if (onboardingData.goalType === 'lose') {
@@ -57,7 +89,7 @@ export function OnboardingScreen({ onNavigate }: OnboardingScreenProps) {
     }
   };
 
-  const handleFinish = () => {
+  const handleFinish = async () => {
     const calorieGoal = calculateCalorieGoal();
     const allAllergies = [...onboardingData.allergies];
     if (onboardingData.otherAllergy) {
@@ -69,19 +101,61 @@ export function OnboardingScreen({ onNavigate }: OnboardingScreenProps) {
     const inches = parseFloat(onboardingData.heightInches || '0');
     const totalInches = (feet * 12) + inches;
 
+    const profileData = {
+      gender: onboardingData.gender || undefined,
+      height: totalInches, // stored in inches
+      weight: parseFloat(onboardingData.weight), // stored in lb
+      goalType: onboardingData.goalType || undefined,
+      calorieGoal: calorieGoal,
+      allergies: allAllergies,
+      dietaryRestrictions: allAllergies
+    };
+
+    // Save to backend
+    try {
+      const token = localStorage.getItem("token");
+      if (token) {
+        const response = await fetch("http://localhost:5050/api/auth/profile", {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`
+          },
+          body: JSON.stringify(profileData)
+        });
+
+        const data = await response.json();
+        
+        if (response.ok && data.user) {
+          // Update localStorage with new user data
+          localStorage.setItem("user", JSON.stringify(data.user));
+          
+          // Update context
+          setUser(data.user);
+          login(user?.username || data.user.username);
+          onNavigate('home');
+          return;
+        }
+      }
+    } catch (error) {
+      console.error("Profile update error:", error);
+    }
+
+    // Fallback: Update local context if backend update fails
     if (user) {
       setUser({
         ...user,
-        gender: onboardingData.gender as any,
-        height: totalInches, // stored in inches
-        weight: parseFloat(onboardingData.weight), // stored in lb
-        goalType: onboardingData.goalType as any,
+        gender: onboardingData.gender as 'male' | 'female' | 'not-specified' | undefined,
+        height: totalInches,
+        weight: parseFloat(onboardingData.weight),
+        goalType: onboardingData.goalType as 'lose' | 'gain' | 'maintain' | undefined,
         calorieGoal: calorieGoal,
         allergies: allAllergies,
         dietaryRestrictions: allAllergies
       });
       login(user.username);
     }
+    
     onNavigate('home');
   };
 
@@ -320,21 +394,37 @@ export function OnboardingScreen({ onNavigate }: OnboardingScreenProps) {
       {step === 4 && (
         <div className="space-y-6">
           <div className="space-y-2">
-            <label className="text-center block text-sm text-gray-700">Your Calorie Goal</label>
+            <label className="text-center block text-sm text-gray-700">Your Health Profile</label>
             <p className="text-sm text-gray-500 text-center">Based on your information</p>
           </div>
           
+          {/* BMI Card */}
+          <div className="bg-gradient-to-br from-blue-50 to-blue-100 border-2 border-blue-200 rounded-xl p-4">
+            <div className="text-sm text-gray-700 mb-1">Your BMI</div>
+            <div className="flex items-baseline gap-2">
+              <div className="text-2xl font-bold text-blue-600">{calculateBMI()}</div>
+              <div className={`text-sm font-medium ${getBMICategory(calculateBMI()).color}`}>
+                {getBMICategory(calculateBMI()).category}
+              </div>
+            </div>
+            <p className="text-xs text-gray-600 mt-2">
+              Body Mass Index helps personalize your calorie goals
+            </p>
+          </div>
+          
+          {/* Calorie Goal Card */}
           <div className="bg-gradient-to-br from-purple-50 to-purple-100 border-2 border-purple-200 rounded-xl p-6 text-center">
             <div className="text-purple-900 mb-2">Recommended Daily Intake</div>
-            <div className="text-purple-600">{calculateCalorieGoal()} calories</div>
-            <p className="text-xs text-gray-600 mt-2">
-              This is customized for your {onboardingData.goalType === 'lose' ? 'weight loss' : onboardingData.goalType === 'gain' ? 'weight gain' : 'maintenance'} goal
+            <div className="text-3xl font-bold text-purple-600">{calculateCalorieGoal()}</div>
+            <div className="text-sm text-purple-700">calories per day</div>
+            <p className="text-xs text-gray-600 mt-3">
+              Customized for your {onboardingData.goalType === 'lose' ? 'weight loss' : onboardingData.goalType === 'gain' ? 'weight gain' : 'maintenance'} goal
             </p>
           </div>
 
           <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
             <p className="text-sm text-blue-900">
-              💡 <strong>Tip:</strong> This is a starting point. You can adjust your goals anytime in your profile.
+              💡 <strong>Tip:</strong> This calculation uses your BMI, gender, and activity level. You can adjust your goals anytime in your profile.
             </p>
           </div>
 
