@@ -9,6 +9,7 @@
     "install:all": "npm install && cd backend && npm install && cd ../my-app && npm install"
   },
   "dependencies": {
+    "dayjs": "^1.11.19",
     "lucide-react": "^0.554.0",
     "mongodb": "^7.0.0",
     "react-router-dom": "^7.9.6",
