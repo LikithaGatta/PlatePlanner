@@ -17,20 +17,53 @@ export function CreateAccountScreen({ onNavigate }: CreateAccountScreenProps) {
     password: ''
   });
 
-  const handleCreateAccount = () => {
-    if (formData.firstName && formData.lastName && formData.email && formData.username) {
-      // Set basic user data, onboarding will add the rest
-      setUser({
-        username: formData.username,
+const handleCreateAccount = async () => {
+  if (!formData.firstName || !formData.lastName || !formData.email || !formData.password) {
+    alert("Please fill all fields");
+    return;
+  }
+
+  try {
+    const response = await fetch("http://localhost:5050/api/auth/register", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        name: `${formData.firstName} ${formData.lastName}`,
         email: formData.email,
-        firstName: formData.firstName,
-        lastName: formData.lastName,
-        allergies: [],
-        dietaryRestrictions: []
-      });
-      onNavigate('onboarding');
+        password: formData.password
+      })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || "Account creation failed");
     }
-  };
+
+    localStorage.clear();
+
+    localStorage.setItem("token", data.token);
+    localStorage.setItem("userId", data.userId);
+
+    setUser({
+      username: formData.username,
+      email: formData.email,
+      firstName: formData.firstName,
+      lastName: formData.lastName,
+      allergies: [],
+      dietaryRestrictions: []
+    });
+
+    onNavigate("onboarding");
+
+  } catch (error: any) {
+    console.error(error);
+    alert(error.message || "Account creation failed");
+  }
+};
+
 
   return (
     <div className="w-full max-w-md bg-white rounded-2xl shadow-xl p-8 md:p-12">

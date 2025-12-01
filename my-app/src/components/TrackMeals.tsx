@@ -2,40 +2,39 @@ import { ArrowLeft, Plus, Home, Calendar, BookOpen, User, X } from 'lucide-react
 import { Button } from './ui/button';
 import { Card } from './ui/card';
 import { Input } from './ui/input';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useApp, DailyMealLog, LoggedMeal } from '../context/AppContext';
 import { toast } from 'sonner';
+import axios from "axios";
+
+const API_URL = "http://localhost:5050/api/meals";
 
 interface TrackMealsProps {
   onNavigate: (screen: any) => void;
 }
 
 export function TrackMeals({ onNavigate }: TrackMealsProps) {
-  const { dailyMealLogs, saveDailyMealLog } = useApp();
+  // ✅ use only user from context, not shared dailyMealLogs
+  const { user } = useApp();
+
   const [selectedDay, setSelectedDay] = useState(16);
   const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   const dates = [13, 14, 15, 16, 17, 18, 19];
   
-  // Get current date string
+  // Get current date string based on selected day
   const getCurrentDateString = () => {
     return `2024-10-${selectedDay}`;
   };
 
-  // Get today's meal log
-  const getTodayLog = (): DailyMealLog => {
-    const dateStr = getCurrentDateString();
-    const existing = dailyMealLogs.find(log => log.date === dateStr);
-    return existing || {
-      date: dateStr,
-      breakfast: [],
-      lunch: [],
-      dinner: [],
-      snacks: []
-    };
-  };
+  // ✅ Local state for today's meals (backed by DB)
+  const [todayMeals, setTodayMeals] = useState<DailyMealLog>({
+    date: getCurrentDateString(),
+    breakfast: [],
+    lunch: [],
+    dinner: [],
+    snacks: []
+  });
 
-  const [todayMeals, setTodayMeals] = useState<DailyMealLog>(getTodayLog());
-  
   // Input states for each meal type
   const [breakfastInput, setBreakfastInput] = useState({ name: '', calories: '' });
   const [lunchInput, setLunchInput] = useState({ name: '', calories: '' });
@@ -48,22 +47,52 @@ export function TrackMeals({ onNavigate }: TrackMealsProps) {
   const [showDinnerInput, setShowDinnerInput] = useState(false);
   const [showSnacksInput, setShowSnacksInput] = useState(false);
 
-  // Update meals when date changes
+  // ✅ Fetch meals for logged-in user from backend (persisted per user)
+  const fetchMealsForUser = async () => {
+    try {
+      const token = localStorage.getItem("token");
+
+      if (!token) {
+        console.error("No token found");
+        return;
+      }
+
+      const res = await axios.get<DailyMealLog[]>(API_URL, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const dateStr = getCurrentDateString();
+      const todayData = res.data.find((log: DailyMealLog) => log.date === dateStr);
+
+      setTodayMeals(todayData || {
+        date: dateStr,
+        breakfast: [],
+        lunch: [],
+        dinner: [],
+        snacks: []
+      });
+
+    } catch (err) {
+      console.error("FETCH ERROR:", err);
+    }
+  };
+
+  // ✅ Re-fetch when date or user changes
+  useEffect(() => {
+    fetchMealsForUser();
+  }, [selectedDay, user]);
+
+  // ✅ Date change just updates selectedDay; meals are pulled from DB in useEffect
   const handleDateChange = (date: number) => {
     setSelectedDay(date);
-    const dateStr = `2024-10-${date}`;
-    const existing = dailyMealLogs.find(log => log.date === dateStr);
-    setTodayMeals(existing || {
-      date: dateStr,
-      breakfast: [],
-      lunch: [],
-      dinner: [],
-      snacks: []
-    });
   };
 
   const addMeal = (mealType: 'breakfast' | 'lunch' | 'dinner' | 'snacks') => {
-    let input, setInput, setShowInput;
+    let input: { name: string; calories: string };
+    let setInput: React.Dispatch<React.SetStateAction<{ name: string; calories: string }>>;
+    let setShowInput: React.Dispatch<React.SetStateAction<boolean>>;
     
     switch(mealType) {
       case 'breakfast':
@@ -82,6 +111,7 @@ export function TrackMeals({ onNavigate }: TrackMealsProps) {
         setShowInput = setShowDinnerInput;
         break;
       case 'snacks':
+      default:
         input = snacksInput;
         setInput = setSnacksInput;
         setShowInput = setShowSnacksInput;
@@ -122,9 +152,29 @@ export function TrackMeals({ onNavigate }: TrackMealsProps) {
       .reduce((sum, meal) => sum + meal.calories, 0);
   };
 
-  const handleSave = () => {
-    saveDailyMealLog(todayMeals);
-    toast.success('Meals saved successfully!');
+  const handleSave = async () => {
+    try {
+      const token = localStorage.getItem("token");
+
+      if (!token) {
+        toast.error("Not logged in");
+        return;
+      }
+
+      const res = await axios.post(API_URL, todayMeals, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json"
+        }
+      });
+
+      console.log("Saved:", res.data);
+      toast.success("Meals saved permanently");
+
+    } catch (error) {
+      console.error("SAVE FAILED:", error);
+      toast.error("Save failed");
+    }
   };
 
   return (

@@ -5,7 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { ImageWithFallback } from './ImageWithFallback';
 import { useApp } from '../context/AppContext';
 import { toast } from 'sonner';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 interface RecipeDetailProps {
   onNavigate: (screen: any) => void;
@@ -13,7 +13,15 @@ interface RecipeDetailProps {
 
 export function RecipeDetail({ onNavigate }: RecipeDetailProps) {
   const { selectedRecipe, toggleFavorite, addActivity, rateRecipe } = useApp();
+
+  // 👇 All hooks go at the top and are unconditional
   const [hoveredRating, setHoveredRating] = useState<number | null>(null);
+  const [currentRating, setCurrentRating] = useState<number>(selectedRecipe?.rating ?? 0);
+
+  // Keep local rating in sync if selectedRecipe changes
+  useEffect(() => {
+    setCurrentRating(selectedRecipe?.rating ?? 0);
+  }, [selectedRecipe]);
 
   if (!selectedRecipe) {
     return (
@@ -49,7 +57,6 @@ export function RecipeDetail({ onNavigate }: RecipeDetailProps) {
         text: `Check out this recipe: ${selectedRecipe.name} - ${selectedRecipe.calories} calories`,
         url: window.location.href
       }).catch(() => {
-        // Fallback if share fails
         copyToClipboard();
       });
     } else {
@@ -60,18 +67,15 @@ export function RecipeDetail({ onNavigate }: RecipeDetailProps) {
   const copyToClipboard = () => {
     const text = `${selectedRecipe.name} - ${selectedRecipe.calories} calories`;
     
-    // Try modern clipboard API first
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(text)
         .then(() => {
           toast.success('Recipe details copied to clipboard!');
         })
         .catch(() => {
-          // Fallback to legacy method
           fallbackCopyToClipboard(text);
         });
     } else {
-      // Use fallback for browsers that don't support clipboard API
       fallbackCopyToClipboard(text);
     }
   };
@@ -110,8 +114,11 @@ export function RecipeDetail({ onNavigate }: RecipeDetailProps) {
     });
   };
 
+  // ⭐ Rating handler – updates local state AND context/backend
   const handleRating = (rating: number) => {
+    setCurrentRating(rating); // keeps stars filled after click
     rateRecipe(selectedRecipe.id, rating);
+
     toast.success(`Rated ${rating} star${rating > 1 ? 's' : ''}!`);
     addActivity({
       type: 'rating',
@@ -119,7 +126,6 @@ export function RecipeDetail({ onNavigate }: RecipeDetailProps) {
     });
   };
 
-  // Default values if not provided
   const ingredients = selectedRecipe.ingredients || [
     'Ingredients not available',
     'Check the recipe source for details'
@@ -264,7 +270,7 @@ export function RecipeDetail({ onNavigate }: RecipeDetailProps) {
               >
                 <Star
                   className={`w-8 h-8 ${
-                    (hoveredRating !== null ? star <= hoveredRating : star <= (selectedRecipe.rating || 0))
+                    (hoveredRating !== null ? star <= hoveredRating : star <= currentRating)
                       ? 'fill-yellow-400 text-yellow-400'
                       : 'text-gray-300'
                   }`}
@@ -272,9 +278,9 @@ export function RecipeDetail({ onNavigate }: RecipeDetailProps) {
               </button>
             ))}
           </div>
-          {selectedRecipe.rating && (
+          {currentRating > 0 && (
             <p className="text-center text-xs text-gray-500 mt-2">
-              Your rating: {selectedRecipe.rating} star{selectedRecipe.rating > 1 ? 's' : ''}
+              Your rating: {currentRating} star{currentRating > 1 ? 's' : ''}
             </p>
           )}
         </Card>
