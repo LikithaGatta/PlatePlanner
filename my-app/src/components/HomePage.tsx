@@ -77,7 +77,7 @@ export function HomePage({ onNavigate }: HomePageProps) {
           
           <button
             onClick={() => onNavigate('plate-planner')}
-            className="w-full bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-700 hover:to-purple-600 text-white h-14 rounded-xl shadow-md flex items-center justify-between px-6 transition-colors"
+            className="w-full h-14 rounded-xl border-2 border-gray-300 bg-white hover:bg-gray-50 flex items-center justify-between px-6 transition-colors"
           >
             <span className="flex items-center gap-2">
               <Plus className="w-5 h-5" />

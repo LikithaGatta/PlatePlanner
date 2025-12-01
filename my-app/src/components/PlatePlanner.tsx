@@ -3,9 +3,12 @@ import { Button } from './ui/button';
 import { Label } from './ui/label';
 import { Input } from './ui/input';
 import { Card } from './ui/card';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { toast } from 'sonner';
+import axios from 'axios';
+
+const API_URL = "http://localhost:5050/api/meal-plans";
 
 interface PlatePlannerProps {
   onNavigate: (screen: any) => void;
@@ -23,29 +26,92 @@ export function PlatePlanner({ onNavigate }: PlatePlannerProps) {
   const [showRecipePicker, setShowRecipePicker] = useState<'breakfast' | 'lunch' | 'dinner' | 'snacks' | null>(null);
   const [customMealInput, setCustomMealInput] = useState('');
 
-  const handleSavePlan = () => {
-    // Convert meal names to Recipe objects or undefined
-    const breakfastRecipe = meals.breakfast ? recipes.find(r => r.name === meals.breakfast) : undefined;
-    const lunchRecipe = meals.lunch ? recipes.find(r => r.name === meals.lunch) : undefined;
-    const dinnerRecipe = meals.dinner ? recipes.find(r => r.name === meals.dinner) : undefined;
-    const snacksRecipe = meals.snacks ? recipes.find(r => r.name === meals.snacks) : undefined;
+  // Fetch meal plan for selected date
+  useEffect(() => {
+    const fetchMealPlan = async () => {
+      try {
+        const token = localStorage.getItem("token");
+        if (!token) return;
 
-    saveMealPlan({
-      date: selectedDate,
-      breakfast: breakfastRecipe,
-      lunch: lunchRecipe,
-      dinner: dinnerRecipe,
-      snacks: snacksRecipe ? [snacksRecipe] : undefined
-    });
-    
-    toast.success('Meal plan saved successfully!', {
-      description: `Your plan for ${new Date(selectedDate).toLocaleDateString()} has been saved.`
-    });
-    
-    addActivity({
-      type: 'meal-plan',
-      description: `Meal plan saved for ${new Date(selectedDate).toLocaleDateString()}`
-    });
+        const res = await axios.get(`${API_URL}/${selectedDate}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (res.data && res.data.date) {
+          setMeals({
+            breakfast: res.data.breakfast || '',
+            lunch: res.data.lunch || '',
+            dinner: res.data.dinner || '',
+            snacks: res.data.snacks || ''
+          });
+        } else {
+          // Reset meals if no plan exists for this date
+          setMeals({
+            breakfast: '',
+            lunch: '',
+            dinner: '',
+            snacks: ''
+          });
+        }
+      } catch (err) {
+        console.error("FETCH MEAL PLAN ERROR:", err);
+      }
+    };
+
+    fetchMealPlan();
+  }, [selectedDate]);
+
+  const handleSavePlan = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      
+      if (!token) {
+        toast.error("Not logged in");
+        return;
+      }
+
+      // Save to MongoDB
+      await axios.post(API_URL, {
+        date: selectedDate,
+        breakfast: meals.breakfast,
+        lunch: meals.lunch,
+        dinner: meals.dinner,
+        snacks: meals.snacks
+      }, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json"
+        }
+      });
+
+      // Also save to local context
+      const breakfastRecipe = meals.breakfast ? recipes.find(r => r.name === meals.breakfast) : undefined;
+      const lunchRecipe = meals.lunch ? recipes.find(r => r.name === meals.lunch) : undefined;
+      const dinnerRecipe = meals.dinner ? recipes.find(r => r.name === meals.dinner) : undefined;
+      const snacksRecipe = meals.snacks ? recipes.find(r => r.name === meals.snacks) : undefined;
+
+      saveMealPlan({
+        date: selectedDate,
+        breakfast: breakfastRecipe,
+        lunch: lunchRecipe,
+        dinner: dinnerRecipe,
+        snacks: snacksRecipe ? [snacksRecipe] : undefined
+      });
+      
+      toast.success('Meal plan saved successfully!', {
+        description: `Your plan for ${new Date(selectedDate).toLocaleDateString()} has been saved.`
+      });
+      
+      addActivity({
+        type: 'meal-plan',
+        description: `Meal plan saved for ${new Date(selectedDate).toLocaleDateString()}`
+      });
+    } catch (error) {
+      console.error("SAVE MEAL PLAN ERROR:", error);
+      toast.error("Failed to save meal plan");
+    }
   };
 
   const selectRecipe = (recipeName: string) => {

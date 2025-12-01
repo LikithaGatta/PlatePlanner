@@ -32,7 +32,9 @@ const handleCreateAccount = async () => {
       body: JSON.stringify({
         name: `${formData.firstName} ${formData.lastName}`,
         email: formData.email,
-        password: formData.password
+        password: formData.password,
+        firstName: formData.firstName,
+        lastName: formData.lastName
       })
     });
 
@@ -46,9 +48,14 @@ const handleCreateAccount = async () => {
 
     localStorage.setItem("token", data.token);
     localStorage.setItem("userId", data.userId);
+    
+    // Store user data in localStorage to persist across sessions
+    if (data.user) {
+      localStorage.setItem("user", JSON.stringify(data.user));
+    }
 
-    setUser({
-      username: formData.username,
+    setUser(data.user || {
+      username: formData.username || formData.email,
       email: formData.email,
       firstName: formData.firstName,
       lastName: formData.lastName,
