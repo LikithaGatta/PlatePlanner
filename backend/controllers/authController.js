@@ -2,20 +2,21 @@ const User = require("../models/User");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 
+// create new account
 exports.register = async (req, res) => {
   try {
     const { name, email, password, firstName, lastName } = req.body;
 
-    // Prevent duplicate users
+    // check if email already exists
     const existingUser = await User.findOne({ email });
     if (existingUser) {
       return res.status(400).json({ error: "User already exists" });
     }
 
-    // Hash password
+    // encrypt the password so we never store plain text
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Create user
+    // make new user in database
     const newUser = new User({
       name: name || `${firstName} ${lastName}`,
       email,
@@ -28,12 +29,14 @@ exports.register = async (req, res) => {
 
     await newUser.save();
 
+    // create login token that lasts 7 days
     const token = jwt.sign(
       { userId: newUser._id }, 
       process.env.JWT_SECRET, 
       { expiresIn: "7d" }
     );
 
+    // send back token and user info
     res.status(201).json({
       token,
       userId: newUser._id,
@@ -55,28 +58,31 @@ exports.register = async (req, res) => {
 
 
 
+// log in existing user
 exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    // Check user existence
+    // find user by email
     const user = await User.findOne({ email });
     if (!user) {
       return res.status(400).json({ error: "User not found" });
     }
 
-    // Compare passwords
+    // check if password matches
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
       return res.status(400).json({ error: "Invalid credentials" });
     }
 
+    // make login token
     const token = jwt.sign(
       { userId: user._id },
       process.env.JWT_SECRET,
       { expiresIn: "7d" }
     );
 
+    // send back all user data
     res.json({
       token,
       userId: user._id,
@@ -101,6 +107,7 @@ exports.login = async (req, res) => {
   }
 };
 
+// reset user password
 exports.resetPassword = async (req, res) => {
   try {
     const { email, newPassword } = req.body;
@@ -109,16 +116,16 @@ exports.resetPassword = async (req, res) => {
       return res.status(400).json({ error: "Email and new password are required" });
     }
 
-    // Find user by email
+    // find the user
     const user = await User.findOne({ email });
     if (!user) {
       return res.status(404).json({ error: "User not found" });
     }
 
-    // Hash new password
+    // encrypt new password
     const hashedPassword = await bcrypt.hash(newPassword, 10);
 
-    // Update password
+    // save it
     user.password = hashedPassword;
     await user.save();
 
@@ -130,9 +137,10 @@ exports.resetPassword = async (req, res) => {
   }
 };
 
+// update user profile info
 exports.updateProfile = async (req, res) => {
   try {
-    const userId = req.userId; // from auth middleware
+    const userId = req.userId; // comes from auth middleware
     const { firstName, lastName, email, gender, height, weight, goalType, calorieGoal, allergies, dietaryRestrictions } = req.body;
 
     const user = await User.findById(userId);
@@ -140,11 +148,11 @@ exports.updateProfile = async (req, res) => {
       return res.status(404).json({ error: "User not found" });
     }
 
-    // Update basic info fields
+    // update basic stuff
     if (firstName !== undefined) user.firstName = firstName;
     if (lastName !== undefined) user.lastName = lastName;
     if (email !== undefined) {
-      // Check if email is already taken by another user
+      // make sure no one else has this email
       const existingUser = await User.findOne({ email, _id: { $ne: userId } });
       if (existingUser) {
         return res.status(400).json({ error: "Email already in use" });
@@ -152,7 +160,7 @@ exports.updateProfile = async (req, res) => {
       user.email = email;
     }
     
-    // Update health/goal fields
+    // update health info
     if (gender !== undefined) user.gender = gender;
     if (height !== undefined) user.height = height;
     if (weight !== undefined) user.weight = weight;

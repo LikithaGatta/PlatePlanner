@@ -102,7 +102,16 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   });
   const [user, setUser] = useState<User | null>(() => {
     const storedUser = localStorage.getItem('user');
-    return storedUser ? JSON.parse(storedUser) : null;
+    const token = localStorage.getItem('token');
+    if (storedUser && token) {
+      const parsedUser = JSON.parse(storedUser);
+      // Ensure token is in user object
+      if (!parsedUser.token) {
+        parsedUser.token = token;
+      }
+      return parsedUser;
+    }
+    return null;
   });
   const [recipes, setRecipes] = useState<Recipe[]>([
     {
@@ -374,6 +383,15 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   localStorage.clear();
 };
 
+  const updateUser = (newUser: User | null) => {
+    setUser(newUser);
+    if (newUser) {
+      localStorage.setItem('user', JSON.stringify(newUser));
+    } else {
+      localStorage.removeItem('user');
+    }
+  };
+
 
   const toggleFavorite = (recipeId: number) => {
     setRecipes(recipes.map(recipe => 
@@ -434,7 +452,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       dailyMealLogs,
       login, 
       logout, 
-      setUser,
+      setUser: updateUser,
       toggleFavorite,
       addActivity,
       rateRecipe,

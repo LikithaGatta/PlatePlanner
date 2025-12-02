@@ -55,12 +55,14 @@ const handleCreateAccount = async () => {
     }
 
     setUser(data.user || {
+      _id: data.userId,
       username: formData.username || formData.email,
       email: formData.email,
       firstName: formData.firstName,
       lastName: formData.lastName,
       allergies: [],
-      dietaryRestrictions: []
+      dietaryRestrictions: [],
+      token: data.token
     });
 
     onNavigate("onboarding");
